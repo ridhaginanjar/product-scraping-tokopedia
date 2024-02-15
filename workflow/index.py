@@ -2,6 +2,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from workflow.transform import transform
+from workflow.export import export
 
 
 def get_html(product_name):
@@ -17,51 +18,87 @@ def main(params):
     product = params.product_name
     soup = get_html(product)
 
-    images = soup.find_all('img', class_='css-1q90pod')
-    for image in images:
-        src = image['src']
+    products = []
 
-    products_name = soup.find_all('div', class_='prd_link-product-name')
-    for product_name in products_name:
-        product_name = product_name.string
+    product_elements = soup.find_all('div', class_='prd_container-card')
+    for product_element in product_elements:
+        data = {}
 
-    base_prices = soup.find_all('div', class_='prd_link-product-price')
-    for base_price in base_prices:
-        base_price = base_price.string
-        transform.transform_baseprice(base_price)
+        # Extract Image
+        try:
+            images = product_element.find('img', class_='css-1q90pod')['src']
+            data['images'] = images
+        except:
+            data['images'] = None
 
-    discounts = soup.find_all('div', class_='prd_badge-product-discount')
-    for discount in discounts:
-        discount = discount.string
-        transform.transform_discount(discount)
+        # Extract product_name
+        try:
+            products_name = product_element.find('div', class_='prd_link-product-name').string
+            data['product_name'] = products_name
+        except:
+            data['product_name'] = None
 
-    prices_after_discounts = soup.find_all('div', class_="prd_label-product-slash-price")
-    for price in prices_after_discounts:
-        price = price.string
-        transform.transform_discprice(price)
+        # Extract base_price
+        try:
+            base_prices = product_element.find('div', class_='prd_link-product-price').string
+            converted_baseprice = transform.transform_baseprice(base_prices)
+            data['base_price'] = converted_baseprice
+        except:
+            data['base_price'] = None
 
-    price_bef_discounts = soup.find_all('div', class_='prd_label-product-slash-price')
-    for price_bef_discount in price_bef_discounts:
-        price_bef_discount = price_bef_discount.string
+        # Extract discount
+        try:
+            discount = product_element.find('div', class_='prd_badge-product-discount').string
+            converted_discount = transform.transform_discount(discount)
+            data['discount'] = converted_discount
+        except:
+            data['discount'] = None
 
-    cashbacks = soup.find_all('div', class_='prd_label-product-price')
-    for cashback in cashbacks:
-        cashback = cashback.string
-        transform.transform_cashback(cashback)
+        # Extract prices_after_discount
+        try:
+            prices_after_discounts = product_element.find('div', class_="prd_label-product-slash-price").string
+            converted_discprice = transform.transform_discprice(prices_after_discounts)
+            data['price_before_discount'] = converted_discprice
+        except:
+            data['price_before_discount'] = None
 
-    toko_addresses = soup.find_all('span', class_='prd_link-shop-loc')
-    for toko_address in toko_addresses:
-        toko_address = toko_address.string
+        # Extract cashback
+        try:
+            cashback = product_element.find('div', class_='prd_label-product-price').string
+            converted_cashback = transform.transform_cashback(cashback)
+            data['cashback'] = converted_cashback
+        except:
+            data['cashback'] = None
 
-    toko_names = soup.find_all('span', class_='prd_link-shop-name')
-    for toko_name in toko_names:
-        toko_name = toko_name.string
+        # Extract toko_address
+        try:
+            toko_address = product_element.find('span', class_='prd_link-shop-loc').string
+            data['toko_address'] = toko_address
+        except:
+            data['toko_address'] = None
 
-    ratings = soup.find_all('span', class_='prd_rating-average-text')
-    for rating in ratings:
-        rating = float(rating.string)
+        # Extract toko_name
+        try:
+            toko_name = product_element.find('span', class_='prd_link-shop-name').string
+            data['toko_name'] = toko_name
+        except:
+            data['toko_name'] = None
 
-    items_solds = soup.find_all('span', class_='prd_label-integrity')
-    for item_sold in items_solds:
-        item_sold = item_sold.string
-        transform.transform_sold(item_sold)
+        # Extract rating
+        try:
+            rating = soup.find('span', class_='prd_rating-average-text').string
+            data['ratings'] = float(rating)
+        except:
+            data['ratings'] = None
+
+        # Extract item_sold
+        try:
+            item_sold = product_element.find('span', class_='prd_label-integrity').string
+            converted_items_solds = transform.transform_sold(item_sold)
+            data['items_sold'] = converted_items_solds
+        except:
+            data['items_sold'] = None
+
+        products.append(data)
+
+    export.export(products)
